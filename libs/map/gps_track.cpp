@@ -235,11 +235,15 @@ size_t GpsTrack::Finalize()
 
     // Initialize from scratch.
     m_thread = {};
+    std::lock_guard lg(m_threadGuard);
     m_threadWakeup = m_threadExit = false;
   }
 
   std::vector<location::GpsInfo> points;
   m_filter->Finalize(points);
+
+  if (!m_collection)  // If no worker thread was started.
+    return 0;
 
   if (!points.empty())
     m_collection->Add(points);

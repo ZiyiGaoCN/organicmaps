@@ -542,7 +542,7 @@ public:
   /// Resize event from window.
   void OnSize(int w, int h);
 
-  enum EScaleMode
+  enum class EScaleMode
   {
     SCALE_MAG,
     SCALE_MAG_LIGHT,

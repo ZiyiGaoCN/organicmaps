@@ -88,6 +88,9 @@ void Track::setData(kml::TrackData const & data)
 {
   m_isDirty = true;
   m_data = data;
+  m_trackStatistics.reset();
+  m_elevationInfo.reset();
+  m_interactionData.reset();
 }
 
 m2::RectD Track::GetLimitRect() const
