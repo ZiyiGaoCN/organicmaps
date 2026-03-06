@@ -111,6 +111,17 @@ using namespace osmoh;
   BOOL const isClosed = [self cellKeyForRow:row] != MWMOpeningHoursEditorTimeSpanCell;
   auto tt = [self timeTableProxy];
   NSUInteger const index = isClosed ? [self closedTimeIndex:row] : 0;
+
+  // Defensive bounds check: the table view may display stale rows during
+  // navigation transitions if the data model was modified without a full reload.
+  if (isClosed && index >= tt.GetExcludeTime().size())
+  {
+    NSDateComponents * dc = [[NSDateComponents alloc] init];
+    dc.hour = 0;
+    dc.minute = 0;
+    return dc;
+  }
+
   Timespan span = isClosed ? tt.GetExcludeTime()[index] : tt.GetOpeningTime();
   return dateComponentsFromTime(isStart ? span.GetStart() : span.GetEnd());
 }
@@ -123,6 +134,10 @@ using namespace osmoh;
   auto tt = [self timeTableProxy];
   NSUInteger const row = self.selectedRow.unsignedIntegerValue;
   NSUInteger const index = isClosed ? [self closedTimeIndex:row] : 0;
+
+  if (isClosed && index >= tt.GetExcludeTime().size())
+    return;
+
   Timespan span = isClosed ? tt.GetExcludeTime()[index] : tt.GetOpeningTime();
 
   if (startTime)
@@ -140,8 +155,6 @@ using namespace osmoh;
     span.SetEnd(endHM);
   }
 
-  NSUInteger const closedTimesCountBeforeUpdate = [self closedTimesCount];
-
   if (isClosed)
   {
     if (!tt.ReplaceExcludeTime(span, index) && self.removeBrokenExcludeTime)
@@ -152,8 +165,7 @@ using namespace osmoh;
     tt.SetOpeningTime(span);
   }
   tt.Commit();
-
-  [self refresh:closedTimesCountBeforeUpdate != [self closedTimesCount]];
+  // Note: callers are responsible for table updates after data mutation.
 }
 
 #pragma mark - Closed Time
@@ -176,6 +188,7 @@ using namespace osmoh;
 - (void)addClosedTime
 {
   self.removeBrokenExcludeTime = YES;
+  // Deselect current row via setter (runs its own batch update, not nested).
   self.selectedRow = nil;
 
   NSUInteger const row = [self firstRowForKey:MWMOpeningHoursEditorAddClosedCell];
@@ -197,9 +210,15 @@ using namespace osmoh;
 
   if (closedTimesCountAfterUpdate > closedTimesCountBeforeUpdate)
   {
+    // Deselect other sections before our batch update to avoid nesting.
+    [self.delegate updateActiveSection:self.index];
+
     [self.delegate.tableView update:^{
       [self insertRow:row];
-      self.selectedRow = @(row);
+      // Set selection directly (not via setter) and insert selector row
+      // in the same batch to avoid nested performBatchUpdates.
+      self->_selectedRow = @(row);
+      [self insertRow:row + 1];
     }];
   }
   [self refresh:NO];
@@ -207,20 +226,28 @@ using namespace osmoh;
 
 - (void)removeClosedTime:(NSUInteger)row
 {
-  NSUInteger const closedTimesCountBeforeUpdate = [self closedTimesCount];
-  self.skipStoreCachedData = [self isRowSelected:row];
-  if (closedTimesCountBeforeUpdate == [self closedTimesCount])
-  {
-    [self.delegate.tableView update:^{
-      auto timeTable = [self timeTableProxy];
-      timeTable.RemoveExcludeTime([self closedTimeIndex:row]);
-      timeTable.Commit();
+  BOOL const wasSelected = [self isRowSelected:row];
+  self.skipStoreCachedData = wasSelected;
 
-      self.selectedRow = nil;
-      [self deleteRow:row];
-    }];
-  }
-  [self refresh:NO];
+  // Compute the exclude time index while the state is still consistent.
+  NSUInteger const index = [self closedTimeIndex:row];
+
+  // Store cached data for the currently selected row (if it's not the one being removed).
+  // This is a pure data mutation (no table updates).
+  [self storeCachedData];
+
+  // Remove the exclude time (data mutation, outside any batch update).
+  auto timeTable = [self timeTableProxy];
+  timeTable.RemoveExcludeTime(index);
+  timeTable.Commit();
+
+  // Clear selection state directly to avoid nested performBatchUpdates.
+  _selectedRow = nil;
+
+  // Full reload to synchronize the table with the updated data model.
+  // This avoids complex index arithmetic after data mutations that can
+  // shift exclude time indices (e.g. FixTimeSpans merging spans).
+  [self refresh:YES];
 }
 
 #pragma mark - Selected days
@@ -320,6 +347,7 @@ using namespace osmoh;
   if ((!_selectedRow && !selectedRow) || _selectedRow.unsignedIntegerValue == selectedRow.unsignedIntegerValue)
     return;
   NSUInteger const closedTimesCountBeforeUpdate = [self closedTimesCount];
+  // storeCachedData is a pure data mutation (no table refresh calls).
   [self storeCachedData];
   if (closedTimesCountBeforeUpdate != [self closedTimesCount])
   {
@@ -334,12 +362,17 @@ using namespace osmoh;
 
   id<MWMOpeningHoursSectionProtocol> delegate = self.delegate;
   UITableView * tableView = delegate.tableView;
+
+  // Deselect other sections BEFORE our batch update to avoid
+  // nested performBatchUpdates (which can cause data/UI inconsistency).
+  if (!oldSelectedRow && selectedRow)
+    [delegate updateActiveSection:self.index];
+
   [tableView update:^{
     if (!oldSelectedRow)
     {
       self->_selectedRow = selectedRow;
       [self insertRow:newInd + 1];
-      [delegate updateActiveSection:self.index];
     }
     else if (selectedRow)
     {
