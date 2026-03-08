@@ -715,26 +715,33 @@ line|z19-[public_transport=platform],
 
 /* 9. ISOLINES */
 
-line|z11-[isoline=step_1000],
+line|z10-[isoline=step_1000],
 {color: @isoline1000;}
-line|z11-[isoline=step_500],
+line|z10-[isoline=step_500],
 {color: @isoline500;}
 
-line|z12-[isoline=step_100],
+line|z11-[isoline=step_100],
 {color: @isoline100;}
 
-line|z14-[isoline=step_50],
-line|z15-[isoline=zero],
+line|z12-[isoline=step_50],
+line|z13-[isoline=zero],
 {color: @isoline50;}
 
-line|z15-[isoline=step_10],
+line|z14-[isoline=step_10],
 {color: @isoline10;}
 
+
+line|z10[isoline=step_1000],
+{width: 0.6; opacity: 0.3;}
+line|z10[isoline=step_500],
+{width: 0.6; opacity: 0.15;}
 
 line|z11[isoline=step_1000],
 {width: 0.8; opacity: 0.4;}
 line|z11[isoline=step_500],
 {width: 0.8; opacity: 0.2;}
+line|z11[isoline=step_100],
+{width: 0.6; opacity: 0.15;}
 
 line|z12-13[isoline=step_1000],
 {width: 1.0; opacity: 0.4;}
@@ -742,6 +749,11 @@ line|z12-13[isoline=step_500],
 {width: 0.8; opacity: 0.35;}
 line|z12-13[isoline=step_100],
 {width: 0.8; opacity: 0.2;}
+line|z12-13[isoline=step_50],
+{width: 0.6; opacity: 0.15;}
+
+line|z13[isoline=zero],
+{width: 0.6; opacity: 0.15;}
 
 line|z14-[isoline=step_1000],
 {width: 1.2; opacity: 0.5;}
@@ -752,6 +764,9 @@ line|z14-15[isoline=step_100],
 line|z14-15[isoline=step_50],
 {width: 0.8; opacity: 0.2;}
 
+line|z14[isoline=zero],
+line|z14[isoline=step_10],
+{width: 0.6; opacity: 0.15;}
 line|z15[isoline=zero],
 line|z15[isoline=step_10],
 {width: 0.8; opacity: 0.2;}
